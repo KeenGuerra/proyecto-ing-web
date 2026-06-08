@@ -1,0 +1,389 @@
+<div class="dashboard-container">
+  <!-- Header -->
+  <header class="dashboard-header">
+    <div class="logo-area">
+      <div class="logo-icon">TF</div>
+      <div class="logo-text">
+        <h1>TaskFlow</h1>
+        <p>Tu espacio de trabajo colaborativo</p>
+      </div>
+    </div>
+
+    <!-- DB Status indicator (Real Firestore vs Demo DB) -->
+    <div class="db-status-container" [ngClass]="databaseStatus()" title="Estado de la base de datos">
+      <span class="pulse-led"></span>
+      <span class="db-status-text">
+        {{ databaseStatus() === 'firestore' ? 'Firestore Activo' : databaseStatus() === 'mock' ? 'Modo Demo (Local)' : databaseStatus() === 'loading' ? 'Conectando...' : 'Error de Conexión' }}
+      </span>
+    </div>
+    
+    <div class="header-actions">
+      <button class="btn btn-primary" (click)="openAddModal()">
+        <span class="icon">+</span> Nueva Tarea
+      </button>
+    </div>
+  </header>
+
+  <!-- Error Alerts -->
+  <div *ngIf="errorMessage()" class="alert alert-error">
+    <span class="alert-icon">⚠️</span>
+    <div class="alert-content">
+      <p>{{ errorMessage() }}</p>
+      <button class="btn btn-link" (click)="loadTasks()">Reintentar</button>
+    </div>
+  </div>
+
+  <!-- Stats Dashboard -->
+  <section class="stats-grid">
+    <div class="stat-card total">
+      <div class="stat-info">
+        <span class="stat-label">Total de Tareas</span>
+        <span class="stat-value">{{ stats().total }}</span>
+      </div>
+      <div class="stat-icon total">📋</div>
+    </div>
+    
+    <div class="stat-card todo">
+      <div class="stat-info">
+        <span class="stat-label">Pendientes</span>
+        <span class="stat-value">{{ stats().todo }}</span>
+      </div>
+      <div class="stat-icon todo">⏳</div>
+    </div>
+
+    <div class="stat-card progress">
+      <div class="stat-info">
+        <span class="stat-label">En Progreso</span>
+        <span class="stat-value">{{ stats().inProgress }}</span>
+      </div>
+      <div class="stat-icon progress">⚡</div>
+    </div>
+
+    <div class="stat-card completed">
+      <div class="stat-info">
+        <span class="stat-label">Completadas</span>
+        <span class="stat-value">{{ stats().completed }}</span>
+      </div>
+      <div class="stat-progress">
+        <div class="progress-bar-container">
+          <div class="progress-bar" [style.width.%]="stats().percentage"></div>
+        </div>
+        <span class="progress-percentage">{{ stats().percentage }}%</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Filter & Search Bar -->
+  <section class="filter-bar">
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input 
+        id="searchTasks"
+        type="text" 
+        placeholder="Buscar tarea por título o descripción..." 
+        [ngModel]="searchQuery()" 
+        (ngModelChange)="searchQuery.set($event)"
+      />
+    </div>
+
+    <div class="category-tabs-container">
+      <div class="category-tabs">
+        <button 
+          *ngFor="let cat of categories()"
+          class="category-tab"
+          [class.active]="selectedCategory() === cat"
+          (click)="selectedCategory.set(cat)"
+        >
+          {{ cat === 'all' ? 'Todas las Categorías' : cat }}
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Loading State -->
+  <div *ngIf="loading() && tasks().length === 0" class="loading-spinner-container">
+    <div class="spinner"></div>
+    <p>Cargando tus tareas...</p>
+  </div>
+
+  <!-- Kanban Board -->
+  <main class="kanban-board">
+    
+    <!-- Columna: Pendientes -->
+    <div 
+      class="kanban-column"
+      (dragover)="onDragOver($event)"
+      (drop)="onDrop($event, 'todo')"
+    >
+      <div class="column-header todo">
+        <h3>Pendientes</h3>
+        <span class="task-count">{{ todoCount() }}</span>
+      </div>
+      
+      <div class="task-list">
+        <!-- Empty Placeholder -->
+        <div *ngIf="todoCount() === 0" class="empty-column-placeholder">
+          <div class="placeholder-art">📥</div>
+          <p class="placeholder-title">Sin tareas pendientes</p>
+          <p class="placeholder-desc">Suelta una tarea aquí para actualizar su estado o crea una nueva.</p>
+        </div>
+
+        <ng-container *ngFor="let task of filteredTasks()">
+          <div 
+            *ngIf="task.status === 'todo'"
+            [class]="'task-card ' + task.priority"
+            draggable="true"
+            (dragstart)="onDragStart($event, task)"
+          >
+            <div class="card-tags">
+              <span class="tag-category">{{ task.category || 'General' }}</span>
+              <span class="tag-priority" [ngClass]="task.priority">
+                {{ task.priority === 'high' ? 'Alta' : task.priority === 'medium' ? 'Media' : 'Baja' }}
+              </span>
+            </div>
+            
+            <h4 class="task-title">{{ task.title }}</h4>
+            <p class="task-desc">{{ task.description }}</p>
+            
+            <div class="card-footer">
+              <span class="due-date" *ngIf="task.due_date">
+                📅 {{ task.due_date }}
+              </span>
+              
+              <div class="card-actions">
+                <button class="action-btn edit" (click)="openEditModal(task)" title="Editar">✏️</button>
+                <button class="action-btn delete" (click)="deleteTask(task.id)" title="Eliminar">🗑️</button>
+                <button class="action-btn move" (click)="moveTask(task, 'forward')" title="Iniciar Tarea">➡️</button>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+
+      <button class="add-inline-btn" (click)="openAddModal('todo')">
+        + Añadir Tarea
+      </button>
+    </div>
+
+    <!-- Columna: En Progreso -->
+    <div 
+      class="kanban-column"
+      (dragover)="onDragOver($event)"
+      (drop)="onDrop($event, 'in_progress')"
+    >
+      <div class="column-header in-progress">
+        <h3>En Progreso</h3>
+        <span class="task-count">{{ inProgressCount() }}</span>
+      </div>
+      
+      <div class="task-list">
+        <!-- Empty Placeholder -->
+        <div *ngIf="inProgressCount() === 0" class="empty-column-placeholder">
+          <div class="placeholder-art">⚡</div>
+          <p class="placeholder-title">Sin tareas en progreso</p>
+          <p class="placeholder-desc">Arrastra actividades aquí cuando comiences a trabajar en ellas.</p>
+        </div>
+
+        <ng-container *ngFor="let task of filteredTasks()">
+          <div 
+            *ngIf="task.status === 'in_progress'"
+            [class]="'task-card ' + task.priority"
+            draggable="true"
+            (dragstart)="onDragStart($event, task)"
+          >
+            <div class="card-tags">
+              <span class="tag-category">{{ task.category || 'General' }}</span>
+              <span class="tag-priority" [ngClass]="task.priority">
+                {{ task.priority === 'high' ? 'Alta' : task.priority === 'medium' ? 'Media' : 'Baja' }}
+              </span>
+            </div>
+            
+            <h4 class="task-title">{{ task.title }}</h4>
+            <p class="task-desc">{{ task.description }}</p>
+            
+            <div class="card-footer">
+              <span class="due-date" *ngIf="task.due_date">
+                📅 {{ task.due_date }}
+              </span>
+              
+              <div class="card-actions">
+                <button class="action-btn move" (click)="moveTask(task, 'backward')" title="Regresar a Pendientes">⬅️</button>
+                <button class="action-btn edit" (click)="openEditModal(task)" title="Editar">✏️</button>
+                <button class="action-btn delete" (click)="deleteTask(task.id)" title="Eliminar">🗑️</button>
+                <button class="action-btn move" (click)="moveTask(task, 'forward')" title="Completar Tarea">➡️</button>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+
+      <button class="add-inline-btn" (click)="openAddModal('in_progress')">
+        + Añadir Tarea
+      </button>
+    </div>
+
+    <!-- Columna: Completadas -->
+    <div 
+      class="kanban-column"
+      (dragover)="onDragOver($event)"
+      (drop)="onDrop($event, 'completed')"
+    >
+      <div class="column-header completed">
+        <h3>Completadas</h3>
+        <span class="task-count">{{ completedCount() }}</span>
+      </div>
+      
+      <div class="task-list">
+        <!-- Empty Placeholder -->
+        <div *ngIf="completedCount() === 0" class="empty-column-placeholder">
+          <div class="placeholder-art">🎉</div>
+          <p class="placeholder-title">Sin tareas completadas</p>
+          <p class="placeholder-desc">¡Sigue trabajando! Tus tareas completadas aparecerán listadas aquí.</p>
+        </div>
+
+        <ng-container *ngFor="let task of filteredTasks()">
+          <div 
+            *ngIf="task.status === 'completed'"
+            [class]="'task-card completed-card ' + task.priority"
+            draggable="true"
+            (dragstart)="onDragStart($event, task)"
+          >
+            <div class="card-tags">
+              <span class="tag-category">{{ task.category || 'General' }}</span>
+              <span class="tag-priority" [ngClass]="task.priority">
+                {{ task.priority === 'high' ? 'Alta' : task.priority === 'medium' ? 'Media' : 'Baja' }}
+              </span>
+            </div>
+            
+            <h4 class="task-title">{{ task.title }}</h4>
+            <p class="task-desc">{{ task.description }}</p>
+            
+            <div class="card-footer">
+              <span class="due-date" *ngIf="task.due_date">
+                📅 {{ task.due_date }}
+              </span>
+              
+              <div class="card-actions">
+                <button class="action-btn move" (click)="moveTask(task, 'backward')" title="Regresar a En Progreso">⬅️</button>
+                <button class="action-btn edit" (click)="openEditModal(task)" title="Editar">✏️</button>
+                <button class="action-btn delete" (click)="deleteTask(task.id)" title="Eliminar">🗑️</button>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+
+      <button class="add-inline-btn" (click)="openAddModal('completed')">
+        + Añadir Tarea
+      </button>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modal Overlay (Add/Edit Task) -->
+<div class="modal-overlay" *ngIf="isModalOpen()">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2>{{ isEditing() ? 'Editar Tarea' : 'Nueva Tarea' }}</h2>
+      <button class="close-btn" (click)="closeModal()">&times;</button>
+    </div>
+    
+    <form (submit)="onSubmit()" #taskFormDir="ngForm">
+      <div class="modal-body">
+        
+        <div class="form-group">
+          <label for="title">Título *</label>
+          <input 
+            type="text" 
+            id="title" 
+            name="title" 
+            required 
+            placeholder="Ej: Integrar API de Firebase"
+            [ngModel]="taskForm().title"
+            (ngModelChange)="taskForm.set({ ...taskForm(), title: $event })"
+            #titleInput="ngModel"
+          />
+          <span class="validation-error" *ngIf="titleInput.touched && titleInput.invalid">
+            El título es obligatorio.
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label for="description">Descripción</label>
+          <textarea 
+            id="description" 
+            name="description" 
+            rows="3" 
+            placeholder="Detalles sobre el trabajo a realizar..."
+            [ngModel]="taskForm().description"
+            (ngModelChange)="taskForm.set({ ...taskForm(), description: $event })"
+          ></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="status">Estado</label>
+            <select 
+              id="status" 
+              name="status"
+              [ngModel]="taskForm().status"
+              (ngModelChange)="taskForm.set({ ...taskForm(), status: $event })"
+            >
+              <option value="todo">Pendiente</option>
+              <option value="in_progress">En Progreso</option>
+              <option value="completed">Completado</option>
+            </select>
+          </div>
+
+          <div class="form-group half">
+            <label for="priority">Prioridad</label>
+            <select 
+              id="priority" 
+              name="priority"
+              [ngModel]="taskForm().priority"
+              (ngModelChange)="taskForm.set({ ...taskForm(), priority: $event })"
+            >
+              <option value="low">Baja</option>
+              <option value="medium">Media</option>
+              <option value="high">Alta</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="category">Categoría</label>
+            <input 
+              type="text" 
+              id="category" 
+              name="category"
+              placeholder="Ej: Frontend, Backend"
+              [ngModel]="taskForm().category"
+              (ngModelChange)="taskForm.set({ ...taskForm(), category: $event })"
+            />
+          </div>
+
+          <div class="form-group half">
+            <label for="due_date">Fecha de Vencimiento</label>
+            <input 
+              type="date" 
+              id="due_date" 
+              name="due_date"
+              [ngModel]="taskForm().due_date"
+              (ngModelChange)="taskForm.set({ ...taskForm(), due_date: $event })"
+            />
+          </div>
+        </div>
+
+      </div>
+      
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary" [disabled]="taskFormDir.invalid">
+          {{ isEditing() ? 'Guardar Cambios' : 'Crear Tarea' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

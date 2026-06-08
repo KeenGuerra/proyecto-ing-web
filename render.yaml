@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: taskflow-app
+    runtime: python
+    buildCommand: ./build.sh
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: NODE_VERSION
+        value: 20.10.0
+      - key: FIREBASE_CREDENTIALS_JSON
+        sync: false
+        description: "El contenido JSON de tu cuenta de servicio de Firebase para conectarse a Firestore."
+      - key: ENVIRONMENT
+        value: production
+      - key: ALLOWED_ORIGINS
+        value: ""
+        description: "Orígenes CORS adicionales separados por comas si decides hospedar el frontend por separado."

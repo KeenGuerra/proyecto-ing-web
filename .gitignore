@@ -1,0 +1,36 @@
+# Firebase credentials (CRITICAL: Do not upload to repository)
+firebase-credentials.json
+
+# Local environments / Python virtual environments
+backend/venv/
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache / logs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.toast
+.history
+.elasticbeanstalk/
+
+# Frontend dependencies and builds
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+.angular/
+
+# Environment configurations
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
