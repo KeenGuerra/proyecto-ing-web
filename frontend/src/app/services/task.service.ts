@@ -10,7 +10,7 @@ export class TaskService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? (window.location.port === '4200' ? 'http://localhost:8000/api/tasks' : '/api/tasks')
-    : '/api/tasks';
+    : ('API_URL_PLACEHOLDER' === 'API_URL_PLACEHOLDER' ? '/api/tasks' : 'API_URL_PLACEHOLDER');
 
   getTasks(): Observable<Task[]> {
     return this.http.get<Task[]>(this.apiUrl);

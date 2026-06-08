@@ -8,7 +8,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.10.0
       - key: NODE_VERSION
-        value: 20.10.0
+        value: 22.22.3
       - key: FIREBASE_CREDENTIALS_JSON
         sync: false
         description: "El contenido JSON de tu cuenta de servicio de Firebase para conectarse a Firestore."
